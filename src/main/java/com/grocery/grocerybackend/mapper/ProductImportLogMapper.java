@@ -1,0 +1,8 @@
+package com.grocery.grocerybackend.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.grocery.grocerybackend.entity.ProductImportLog;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface ProductImportLogMapper extends BaseMapper<ProductImportLog> {}
