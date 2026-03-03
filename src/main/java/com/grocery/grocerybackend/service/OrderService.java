@@ -22,14 +22,17 @@ public class OrderService {
     private final OrderItemMapper orderItemMapper;
     private final PaymentMapper paymentMapper;
     private final ProductMapper productMapper;
+    private final InventoryService inventoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OrderService(OrderMapper orderMapper, OrderItemMapper orderItemMapper,
-                        PaymentMapper paymentMapper, ProductMapper productMapper) {
+            PaymentMapper paymentMapper, ProductMapper productMapper,
+            InventoryService inventoryService) {
         this.orderMapper = orderMapper;
         this.orderItemMapper = orderItemMapper;
         this.paymentMapper = paymentMapper;
         this.productMapper = productMapper;
+        this.inventoryService = inventoryService;
     }
 
     @Transactional
@@ -39,7 +42,8 @@ public class OrderService {
 
         for (var line : req.items) {
             Product p = productMapper.selectById(line.productId);
-            if (p == null) throw new IllegalArgumentException("Product not found: " + line.productId);
+            if (p == null)
+                throw new IllegalArgumentException("Product not found: " + line.productId);
             if (p.getStockQuantity() < line.qty)
                 throw new IllegalStateException("Insufficient stock: " + p.getName());
 
@@ -78,8 +82,8 @@ public class OrderService {
         for (OrderItem oi : items) {
             oi.setOrderId(order.getId());
             orderItemMapper.insert(oi);
-            int ok = productMapper.decrementStock(oi.getProductId(), oi.getQuantity());
-            if (ok == 0) throw new IllegalStateException("Stock changed; try again.");
+            // Use FEFO deduction which updates both batch and product tables
+            inventoryService.deductStockFEFO(oi.getProductId(), oi.getQuantity());
         }
 
         Payment pay = new Payment();
@@ -96,30 +100,29 @@ public class OrderService {
         List<Order> orders = orderMapper.selectList(
                 userId != null
                         ? new QueryWrapper<Order>().eq("user_id", userId)
-                        : new QueryWrapper<Order>()
-        );
+                        : new QueryWrapper<Order>());
 
         return orders.stream().map(o -> {
             List<OrderItem> items = orderItemMapper.selectList(
-                    new QueryWrapper<OrderItem>().eq("order_id", o.getId())
-            );
+                    new QueryWrapper<OrderItem>().eq("order_id", o.getId()));
             return toFrontendResponse(o, items);
         }).collect(Collectors.toList());
     }
 
     public OrderResponse getOrder(Long id) {
         Order o = orderMapper.selectById(id);
-        if (o == null) throw new IllegalArgumentException("Order not found");
+        if (o == null)
+            throw new IllegalArgumentException("Order not found");
         List<OrderItem> items = orderItemMapper.selectList(
-                new QueryWrapper<OrderItem>().eq("order_id", id)
-        );
+                new QueryWrapper<OrderItem>().eq("order_id", id));
         return toFrontendResponse(o, items);
     }
 
     @Transactional
     public void cancel(Long id) {
         Order o = orderMapper.selectById(id);
-        if (o == null) throw new IllegalArgumentException("Order not found");
+        if (o == null)
+            throw new IllegalArgumentException("Order not found");
         if (!OrderStatus.PENDING.name().equals(o.getStatus()))
             throw new IllegalStateException("Only PENDING orders can be cancelled");
 
@@ -127,13 +130,11 @@ public class OrderService {
         orderMapper.updateById(o);
 
         List<OrderItem> items = orderItemMapper.selectList(
-                new QueryWrapper<OrderItem>().eq("order_id", id)
-        );
+                new QueryWrapper<OrderItem>().eq("order_id", id));
         for (OrderItem it : items) {
             productMapper.incrementStock(it.getProductId(), it.getQuantity());
         }
     }
-
 
     private OrderResponse toFrontendResponse(Order o, List<OrderItem> items) {
         OrderResponse r = new OrderResponse();
@@ -144,7 +145,7 @@ public class OrderService {
 
         r.items = items.stream().map(oi -> {
             OrderResponse.Item i = new OrderResponse.Item();
-            i.id = oi.getProductId();                 // or oi.getId() if you prefer item id
+            i.id = oi.getProductId(); // or oi.getId() if you prefer item id
             i.name = oi.getProductName();
             i.qty = oi.getQuantity();
             i.price = oi.getUnitPrice();
@@ -159,12 +160,14 @@ public class OrderService {
             try {
                 var node = objectMapper.readTree(o.getShippingAddress());
                 OrderResponse.ShippingAddress sa = new OrderResponse.ShippingAddress();
-                sa.name   = node.path("name").asText("");
-                sa.address= node.path("address").asText(node.path("addressLine").asText(""));
-                sa.city   = node.path("city").asText("");
+                sa.name = node.path("name").asText("");
+                sa.address = node.path("address").asText(node.path("addressLine").asText(""));
+                sa.city = node.path("city").asText("");
                 sa.postal = node.path("postal").asText(node.path("postalCode").asText(""));
                 r.shippingAddress = sa;
-            } catch (Exception ignored) { r.shippingAddress = null; }
+            } catch (Exception ignored) {
+                r.shippingAddress = null;
+            }
         }
         return r;
     }
@@ -174,8 +177,7 @@ public class OrderService {
     public void cancelByOrderNo(String orderNo, CancelOrderRequest req) {
         // 1) Find order by order_no
         Order o = orderMapper.selectOne(
-                new QueryWrapper<Order>().eq("order_no", orderNo)
-        );
+                new QueryWrapper<Order>().eq("order_no", orderNo));
         if (o == null) {
             throw new IllegalArgumentException("Order not found");
         }
@@ -187,8 +189,8 @@ public class OrderService {
         o.setStatus(OrderStatus.CANCELLED.name());
 
         // 3) Store structured cancel data
-        o.setCancelReason(req.getReason());                    // e.g. "duplicate_order"
-        o.setCancelResolution(req.getAction().name());         // "REFUND" | "SUBSTITUTE"
+        o.setCancelReason(req.getReason()); // e.g. "duplicate_order"
+        o.setCancelResolution(req.getAction().name()); // "REFUND" | "SUBSTITUTE"
 
         // 4) Keep only extra free-text in notes (preserve existing notes)
         if (req.getExtraNotes() != null && !req.getExtraNotes().isBlank()) {
@@ -199,16 +201,14 @@ public class OrderService {
 
         // 5) Restock items
         List<OrderItem> items = orderItemMapper.selectList(
-                new QueryWrapper<OrderItem>().eq("order_id", o.getId())
-        );
+                new QueryWrapper<OrderItem>().eq("order_id", o.getId()));
         for (OrderItem it : items) {
             productMapper.incrementStock(it.getProductId(), it.getQuantity());
         }
 
         // 6) Payment status according to your enum
         Payment payment = paymentMapper.selectOne(
-                new QueryWrapper<Payment>().eq("order_id", o.getId())
-        );
+                new QueryWrapper<Payment>().eq("order_id", o.getId()));
         if (payment != null) {
             String status = payment.getStatus();
             // INIT -> FAILED (never captured)
@@ -226,7 +226,5 @@ public class OrderService {
             paymentMapper.updateById(payment);
         }
     }
-
-
 
 }

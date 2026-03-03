@@ -3,22 +3,31 @@ package com.grocery.grocerybackend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.grocery.grocerybackend.entity.Product;
+import com.grocery.grocerybackend.mapper.BatchMapper;
 import com.grocery.grocerybackend.mapper.ProductMapper;
 import org.springframework.stereotype.Service;
+import com.grocery.grocerybackend.entity.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
 public class ProductService {
 
     private final ProductMapper mapper;
+    private final BatchMapper batchMapper;
 
-    public ProductService(ProductMapper mapper) {
+    public ProductService(ProductMapper mapper, BatchMapper batchMapper) {
         this.mapper = mapper;
+        this.batchMapper = batchMapper;
     }
 
     public List<Product> getAll() {
-        return mapper.selectList(new QueryWrapper<>());
+        List<Product> products = mapper.selectList(new QueryWrapper<>());
+        for (Product p : products) {
+            p.setBatches(batchMapper.findValidBatchesForFefo(p.getId(), LocalDate.of(2000, 1, 1)));
+        }
+        return products;
     }
 
     public int save(Product product) {
@@ -26,8 +35,18 @@ public class ProductService {
     }
 
     // NEW
-    public Product getOne(Long id) {          // <-- add this
-        return mapper.selectById(id);         // returns null if not found
+    public Product getOne(Long id) {
+        Product p = mapper.selectById(id);
+        if (p != null) {
+            List<Batch> batches = batchMapper.findValidBatchesForFefo(p.getId(), LocalDate.of(2000, 1, 1));
+            p.setBatches(batches);
+            // Ensure stock quantity is synced with sum of batches if any exist
+            if (!batches.isEmpty()) {
+                int total = batches.stream().mapToInt(Batch::getAvailableQuantity).sum();
+                p.setStockQuantity(total);
+            }
+        }
+        return p;
     }
 
     // NEW

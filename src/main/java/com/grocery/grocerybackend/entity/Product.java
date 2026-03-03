@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.util.List;
 
 @Data
 @TableName("product")
@@ -28,4 +29,7 @@ public class Product {
     private Timestamp createdAt;
     private Timestamp updatedAt;
     private String sku;
+
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private List<Batch> batches;
 }
