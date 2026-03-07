@@ -73,8 +73,9 @@ public class OrderService {
         order.setShippingFee(shipping);
         order.setDiscount(discount);
         order.setTotal(total); // maps to total_amount in DB
-        order.setStatus(OrderStatus.PENDING.name());
+        order.setStatus(com.grocery.grocerybackend.enums.OrderStatus.PENDING.name());
         order.setPaymentMethod(req.paymentMethod);
+        order.setPaymentDetails(req.paymentDetails);
         order.setShippingAddress(req.shippingAddressJson);
         order.setNotes(req.notes);
         orderMapper.insert(order);
@@ -141,7 +142,11 @@ public class OrderService {
         r.id = o.getOrderNo();
         r.date = o.getCreatedAt() != null ? o.getCreatedAt().toString() : null;
         r.status = o.getStatus();
+        r.subtotal = o.getSubtotal();
+        r.shippingFee = o.getShippingFee();
+        r.discount = o.getDiscount();
         r.total = o.getTotal();
+        r.paymentMethod = o.getPaymentMethod();
 
         r.items = items.stream().map(oi -> {
             OrderResponse.Item i = new OrderResponse.Item();

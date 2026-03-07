@@ -10,15 +10,18 @@ import java.time.LocalDateTime;
 @Data
 @TableName("orders")
 public class Order {
-    @TableId(type = IdType.AUTO) private Long id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
     private String orderNo;
     private Long userId;
     private BigDecimal subtotal;
     private BigDecimal shippingFee;
     private BigDecimal discount;
-    @TableField("total_amount") private BigDecimal total; // maps to your column
-    private String status;         // use enums as String
+    @TableField("total_amount")
+    private BigDecimal total; // maps to your column
+    private String status; // use enums as String
     private String paymentMethod;
+    private String paymentDetails; // JSON metadata
     private String shippingAddress; // JSON/TEXT
     private String notes;
     private LocalDateTime createdAt;
