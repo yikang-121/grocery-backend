@@ -29,4 +29,13 @@ public class InventoryMetrics {
 
     @com.baomidou.mybatisplus.annotation.TableField("std_dev_30d")
     private Double stdDev30d;
+
+    @com.baomidou.mybatisplus.annotation.TableField("seasonality_factor")
+    private Double seasonalityFactor;
+
+    @com.baomidou.mybatisplus.annotation.TableField("incoming_stock")
+    private Integer incomingStock;
+
+    @com.baomidou.mybatisplus.annotation.TableField("case_size")
+    private Integer caseSize;
 }

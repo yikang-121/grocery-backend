@@ -23,7 +23,20 @@ public interface InventoryMetricsMapper extends BaseMapper<InventoryMetrics> {
                     JOIN orders o2 ON oi2.order_id = o2.id 
                     WHERE oi2.product_id = p.id AND o2.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) 
                     GROUP BY DATE(o2.created_at)
-                ) as stats) as stdDev30d
+                ) as stats) as stdDev30d,
+                COALESCE(
+                    (SELECT SUM(oi3.quantity) / 30.0 
+                     FROM order_items oi3 
+                     JOIN orders o3 ON oi3.order_id = o3.id 
+                     WHERE oi3.product_id = p.id 
+                     AND MONTH(o3.created_at) = MONTH(NOW()) 
+                     AND YEAR(o3.created_at) = YEAR(NOW()) - 1
+                    ) / 
+                    (SELECT SUM(oi4.quantity) / GREATEST(DATEDIFF(NOW(), MIN(o4.created_at)), 1)
+                     FROM order_items oi4 
+                     JOIN orders o4 ON oi4.order_id = o4.id 
+                     WHERE oi4.product_id = p.id
+                    ), 1.0) as seasonalityFactor
             FROM product p
             LEFT JOIN order_items oi ON p.id = oi.product_id
             LEFT JOIN orders o ON oi.order_id = o.id

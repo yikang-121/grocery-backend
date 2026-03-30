@@ -63,6 +63,7 @@ public class BaselineRestockOptimizer {
         response.setTargetStock(targetStock);
         response.setNetRequirement(netRequirement);
         response.setRawOrderQty(rawOrderQty);
+        response.setSeasonalityFactor(1.0); // Baseline is neutral to seasonality
         response.setOrderQuantity(finalOrderQty);
 
         return response;

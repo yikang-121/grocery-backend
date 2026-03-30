@@ -25,18 +25,25 @@ CREATE TABLE IF NOT EXISTS inventory_metrics (
     UNIQUE KEY (sku_id)
 );
 
--- 3. Insert specific algorithmic mock constraints for these products
+-- 3. Insert per-product inventory constraints
+-- These static fields define each product's restocking characteristics.
+-- Dynamic fields (avg_sales_3d, avg_sales_30d, std_dev_30d) are populated
+-- by running sync-metrics AFTER seeding orders from seed_orders.sql.
+
 -- 3a. Highly perishable, high-volatility item (Fresh Strawberries)
+--     Short lead time (1 day), daily review, 3-day shelf life, high waste risk
 INSERT INTO inventory_metrics (sku_id, current_stock, lead_time_days, review_period_days, shelf_life_days, supplier_moq, waste_lambda, avg_sales_3d, avg_sales_30d, std_dev_30d)
-VALUES ('STRAW-001', 50, 2, 1, 3, 10, 0.1, 40.0, 45.0, 15.0)
-ON DUPLICATE KEY UPDATE current_stock=50;
+VALUES ('STRAW-001', 50, 1, 1, 3, 10, 0.15, 0, 0, 0)
+ON DUPLICATE KEY UPDATE current_stock=50, lead_time_days=1, review_period_days=1, shelf_life_days=3, supplier_moq=10, waste_lambda=0.15;
 
 -- 3b. Stable, non-perishable item (Canned Beans)
+--     Weekly lead time, weekly review, 1-year shelf life, bulk MOQ, negligible waste
 INSERT INTO inventory_metrics (sku_id, current_stock, lead_time_days, review_period_days, shelf_life_days, supplier_moq, waste_lambda, avg_sales_3d, avg_sales_30d, std_dev_30d)
-VALUES ('BEAN-001', 100, 7, 7, 365, 50, 0.001, 15.0, 16.0, 2.0)
-ON DUPLICATE KEY UPDATE current_stock=100;
+VALUES ('BEAN-001', 100, 7, 7, 365, 50, 0.001, 0, 0, 0)
+ON DUPLICATE KEY UPDATE current_stock=100, lead_time_days=7, review_period_days=7, shelf_life_days=365, supplier_moq=50, waste_lambda=0.001;
 
--- 3c. Trending item experiencing a sudden demand spike (Viral Hot Sauce)
+-- 3c. Trending item with demand spike potential (Viral Hot Sauce)
+--     3-day lead time, 3-day review, 6-month shelf life, moderate MOQ
 INSERT INTO inventory_metrics (sku_id, current_stock, lead_time_days, review_period_days, shelf_life_days, supplier_moq, waste_lambda, avg_sales_3d, avg_sales_30d, std_dev_30d)
-VALUES ('SAUCE-001', 20, 5, 2, 180, 100, 0.005, 100.0, 20.0, 5.0)
-ON DUPLICATE KEY UPDATE current_stock=20;
+VALUES ('SAUCE-001', 20, 3, 3, 180, 24, 0.005, 0, 0, 0)
+ON DUPLICATE KEY UPDATE current_stock=20, lead_time_days=3, review_period_days=3, shelf_life_days=180, supplier_moq=24, waste_lambda=0.005;

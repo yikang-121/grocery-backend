@@ -9,13 +9,15 @@ import com.grocery.grocerybackend.mapper.UserAddressMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List   ;
+import java.util.List;
 
 @Service
 public class UserAddressService {
     private final UserAddressMapper mapper;
 
-    public UserAddressService(UserAddressMapper mapper) { this.mapper = mapper; }
+    public UserAddressService(UserAddressMapper mapper) {
+        this.mapper = mapper;
+    }
 
     public List<UserAddress> listByUser(Long userId) {
         return mapper.selectList(new QueryWrapper<UserAddress>()
@@ -25,7 +27,8 @@ public class UserAddressService {
 
     @Transactional
     public UserAddress create(AddressRequest r) {
-        if (Boolean.TRUE.equals(r.isDefault)) mapper.clearDefault(r.userId);
+        if (Boolean.TRUE.equals(r.isDefault))
+            mapper.clearDefault(r.userId);
         UserAddress ua = new UserAddress();
         ua.setUserId(r.userId);
         ua.setLabel(r.label);
@@ -46,7 +49,8 @@ public class UserAddressService {
         if (exist == null || !exist.getUserId().equals(r.userId))
             throw new IllegalArgumentException("Address not found");
 
-        if (Boolean.TRUE.equals(r.isDefault)) mapper.clearDefault(r.userId);
+        if (Boolean.TRUE.equals(r.isDefault))
+            mapper.clearDefault(r.userId);
 
         exist.setLabel(r.label);
         exist.setName(r.name);
@@ -55,7 +59,8 @@ public class UserAddressService {
         exist.setCity(r.city);
         exist.setState(r.state);
         exist.setPostal(r.postal);
-        if (r.isDefault != null) exist.setIsDefault(r.isDefault ? 1 : 0);
+        if (r.isDefault != null)
+            exist.setIsDefault(r.isDefault ? 1 : 0);
 
         mapper.updateById(exist);
         return mapper.selectById(id);
