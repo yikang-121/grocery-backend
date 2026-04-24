@@ -14,6 +14,9 @@ public class OrderResponse {
     public BigDecimal discount;
     public BigDecimal total;
     public String paymentMethod;
+    public Long userId;
+    public String customerName;
+    public String customerEmail;
     public List<Item> items;
     public ShippingAddress shippingAddress;
 

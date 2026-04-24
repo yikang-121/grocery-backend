@@ -26,12 +26,26 @@ public class InventoryService {
     private final ProductMapper productMapper;
     private final BatchMapper batchMapper;
     private final com.grocery.grocerybackend.mapper.SpoilageLogMapper spoilageLogMapper;
+    private StockMovementService stockMovementService;
 
     public InventoryService(ProductMapper productMapper, BatchMapper batchMapper,
             com.grocery.grocerybackend.mapper.SpoilageLogMapper spoilageLogMapper) {
         this.productMapper = productMapper;
         this.batchMapper = batchMapper;
         this.spoilageLogMapper = spoilageLogMapper;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setStockMovementService(StockMovementService stockMovementService) {
+        this.stockMovementService = stockMovementService;
+    }
+
+    private PurchaseOrderService purchaseOrderService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    public void setPurchaseOrderService(PurchaseOrderService purchaseOrderService) {
+        this.purchaseOrderService = purchaseOrderService;
     }
 
     @Data
@@ -219,7 +233,14 @@ public class InventoryService {
 
                         // Restock only if quantity column exists and value > 0
                         if (hasQtyCol && qty != null && qty > 0) {
-                            productMapper.incrementStock(existing.getId(), qty);
+                            // Create a new batch for this bulk restock
+                            Batch batch = new Batch();
+                            batch.setProductId(existing.getId());
+                            batch.setBatchNo("BULK-RESTOCK-" + System.currentTimeMillis() % 1000000);
+                            batch.setAvailableQuantity(qty);
+                            batch.setExpiryDate(LocalDate.now().plusDays(30)); // Default 30 days
+                            
+                            addBatch(batch);
                             summary.setRestocked(summary.getRestocked() + 1);
                         }
                     }
@@ -260,6 +281,19 @@ public class InventoryService {
 
         // Synchronize product table's total stock (optional but good for display)
         productMapper.decrementStock(productId, quantity);
+
+        // Log stock movement
+        if (stockMovementService != null) {
+            stockMovementService.logMovement(
+                    productId, null, "ORDER_DEDUCT",
+                    quantity, "ORDER", null,
+                    "FEFO deduction: " + quantity + " units");
+        }
+
+        // TRIGGER REAL-TIME RESTOCK CHECK
+        if (purchaseOrderService != null) {
+            purchaseOrderService.triggerRealTimeRestock(productId);
+        }
     }
 
     @Transactional
@@ -274,6 +308,14 @@ public class InventoryService {
         // Update product table's total stock
         if (batch.getAvailableQuantity() != null && batch.getAvailableQuantity() > 0) {
             productMapper.incrementStock(batch.getProductId(), batch.getAvailableQuantity());
+        }
+
+        // Log stock movement
+        if (stockMovementService != null && batch.getAvailableQuantity() != null && batch.getAvailableQuantity() > 0) {
+            stockMovementService.logMovement(
+                    batch.getProductId(), batch.getId(), "STOCK_IN",
+                    batch.getAvailableQuantity(), "BATCH", batch.getId(),
+                    "Batch added: " + batch.getBatchNo());
         }
 
         return batch;
@@ -311,6 +353,14 @@ public class InventoryService {
         log.setReason(reason);
         log.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         spoilageLogMapper.insert(log);
+
+        // Log stock movement
+        if (stockMovementService != null) {
+            stockMovementService.logMovement(
+                    product.getId(), batchId, "SPOILAGE",
+                    quantity, "SPOILAGE_LOG", log.getId(),
+                    "Spoilage: " + reason);
+        }
     }
 
     @Transactional

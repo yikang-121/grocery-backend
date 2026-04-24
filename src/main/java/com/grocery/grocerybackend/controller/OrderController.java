@@ -7,6 +7,7 @@ import com.grocery.grocerybackend.service.OrderService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -25,10 +26,9 @@ public class OrderController {
     }
 
     @GetMapping
-    public List<OrderResponse> list(@RequestParam Long userId) {
-        return orderService.listOrders(userId); // service filters by user_id
+    public List<OrderResponse> list(@RequestParam(required = false) Long userId) {
+        return orderService.listOrders(userId);
     }
-
 
     @GetMapping("/{id}")
     public OrderResponse get(@PathVariable Long id) {
@@ -40,7 +40,6 @@ public class OrderController {
         orderService.cancel(id);
     }
 
-    // controller/OrderController.java
     @PutMapping("/{orderNo}/cancel")
     public void cancelByOrderNo(
             @PathVariable String orderNo,
@@ -49,6 +48,15 @@ public class OrderController {
         orderService.cancelByOrderNo(orderNo, req);
     }
 
+    // ===== Admin Endpoints =====
 
-
+    @PutMapping("/{orderNo}/status")
+    public Map<String, String> updateStatus(
+            @PathVariable String orderNo,
+            @RequestBody Map<String, String> body
+    ) {
+        String newStatus = body.get("status");
+        orderService.updateOrderStatus(orderNo, newStatus);
+        return Map.of("status", "ok", "newStatus", newStatus);
+    }
 }
