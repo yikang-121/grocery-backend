@@ -26,7 +26,9 @@ public class JwtUtil {
 
     // Invalidate a token (add to blacklist)
     public void invalidateToken(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
+        if (token == null || token.isBlank()) return;
+        
+        if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
         blacklistedTokens.add(token);

@@ -93,12 +93,14 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String tokenHeader) {
+    @PostMapping("/signout")
+    public ResponseEntity<Map<String, Object>> logout(@RequestHeader(value = "Authorization", required = false) String tokenHeader) {
         Map<String, Object> response = new HashMap<>();
         try {
-            String jwt = tokenHeader.startsWith("Bearer ") ? tokenHeader.substring(7) : tokenHeader;
-            jwtUtil.invalidateToken(jwt);
+            if (tokenHeader != null && !tokenHeader.isBlank()) {
+                String jwt = tokenHeader.startsWith("Bearer ") ? tokenHeader.substring(7) : tokenHeader;
+                jwtUtil.invalidateToken(jwt);
+            }
             response.put("success", true);
             response.put("message", "Logged out successfully");
             return ResponseEntity.ok(response);
