@@ -93,6 +93,22 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String tokenHeader) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String jwt = tokenHeader.startsWith("Bearer ") ? tokenHeader.substring(7) : tokenHeader;
+            jwtUtil.invalidateToken(jwt);
+            response.put("success", true);
+            response.put("message", "Logged out successfully");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error during logout");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
     // -------- CHANGE PASSWORD --------
     @PostMapping("/change-password")
     public ResponseEntity<Map<String, Object>> changePassword(

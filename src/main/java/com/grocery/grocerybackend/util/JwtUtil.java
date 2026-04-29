@@ -9,6 +9,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class JwtUtil {
@@ -18,6 +20,17 @@ public class JwtUtil {
 
     // Token expiration time (24 hours)
     private final long JWT_EXPIRATION = 86400000;
+
+    // Blacklisted tokens for invalidated sessions (e.g., after logout)
+    private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
+
+    // Invalidate a token (add to blacklist)
+    public void invalidateToken(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        blacklistedTokens.add(token);
+    }
 
     // Generate token with email as subject
     public String generateToken(String email) {
@@ -72,6 +85,9 @@ public class JwtUtil {
     // Validate token
     public Boolean validateToken(String token, String email) {
         try {
+            if (blacklistedTokens.contains(token)) {
+                return false;
+            }
             final String extractedEmail = extractEmail(token);
             return (extractedEmail.equals(email) && !isTokenExpired(token));
         } catch (Exception e) {
@@ -83,6 +99,9 @@ public class JwtUtil {
     // Validate token without email check (useful for general validation)
     public Boolean validateToken(String token) {
         try {
+            if (blacklistedTokens.contains(token)) {
+                return false;
+            }
             extractAllClaims(token);
             return !isTokenExpired(token);
         } catch (Exception e) {
