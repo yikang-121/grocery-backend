@@ -20,6 +20,8 @@ public class RestockCalculationResponse {
     private double netRequirement;
     private double rawOrderQty;
     private double seasonalityFactor;
+    private int currentStock;
     private int incomingStock;
     private int caseSize;
+    private boolean moqRiskFlag;
 }

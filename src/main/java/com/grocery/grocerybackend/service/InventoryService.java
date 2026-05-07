@@ -92,6 +92,8 @@ public class InventoryService {
                     "cost_price", "supplier_price",
                     "price", "selling_price",
                     "stock_quantity", "quantity",
+                    "expiry_date",
+                    "batch_no",
                     "image_url",
                     "original_price",
                     "product_url");
@@ -103,6 +105,8 @@ public class InventoryService {
             boolean hasCostCol = present(idx, "cost_price") || present(idx, "supplier_price");
             boolean hasPriceCol = present(idx, "price") || present(idx, "selling_price");
             boolean hasQtyCol = present(idx, "stock_quantity") || present(idx, "quantity");
+            boolean hasExpiryCol = present(idx, "expiry_date");
+            boolean hasBatchNoCol = present(idx, "batch_no");
             boolean hasImageCol = present(idx, "image_url");
             boolean hasOriginalPriceCol = present(idx, "original_price");
             boolean hasProductUrlCol = present(idx, "product_url");
@@ -133,6 +137,8 @@ public class InventoryService {
                     String costRaw = read(cols, idx, "cost_price", "supplier_price");
                     String priceRaw = read(cols, idx, "price", "selling_price");
                     String qtyRaw = read(cols, idx, "stock_quantity", "quantity");
+                    String expiryRaw = read(cols, idx, "expiry_date");
+                    String batchNoRaw = read(cols, idx, "batch_no");
                     String imageRaw = read(cols, idx, "image_url");
                     String origPriceRaw = read(cols, idx, "original_price");
                     String productUrlRaw = read(cols, idx, "product_url");
@@ -233,12 +239,28 @@ public class InventoryService {
 
                         // Restock only if quantity column exists and value > 0
                         if (hasQtyCol && qty != null && qty > 0) {
+                            // Parse expiry date if provided
+                            LocalDate expiry = LocalDate.now().plusDays(30);
+                            if (hasExpiryCol && expiryRaw != null && !expiryRaw.isBlank()) {
+                                try {
+                                    expiry = LocalDate.parse(expiryRaw.trim());
+                                } catch (Exception e) {
+                                    // keep default
+                                }
+                            }
+                            
+                            // Determine batch number
+                            String finalBatchNo = "BULK-RESTOCK-" + System.currentTimeMillis() % 1000000;
+                            if (hasBatchNoCol && batchNoRaw != null && !batchNoRaw.isBlank()) {
+                                finalBatchNo = batchNoRaw.trim();
+                            }
+
                             // Create a new batch for this bulk restock
                             Batch batch = new Batch();
                             batch.setProductId(existing.getId());
-                            batch.setBatchNo("BULK-RESTOCK-" + System.currentTimeMillis() % 1000000);
+                            batch.setBatchNo(finalBatchNo);
                             batch.setAvailableQuantity(qty);
-                            batch.setExpiryDate(LocalDate.now().plusDays(30)); // Default 30 days
+                            batch.setExpiryDate(expiry);
                             
                             addBatch(batch);
                             summary.setRestocked(summary.getRestocked() + 1);

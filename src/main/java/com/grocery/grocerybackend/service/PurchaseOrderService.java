@@ -266,7 +266,10 @@ public class PurchaseOrderService {
                 .collect(Collectors.toMap(Product::getId, p -> p, (a, b) -> a));
 
         StringBuilder csv = new StringBuilder();
-        csv.append("sku,name,category,cost_price,stock_quantity\n");
+        csv.append("sku,name,category,cost_price,stock_quantity,expiry_date,batch_no\n");
+
+        String numericPo = po.getPoNumber().replaceAll("[^0-9]", "");
+        String defaultBatchNo = "B" + (numericPo.isEmpty() ? po.getId() : numericPo);
 
         for (PurchaseOrderItem item : items) {
             Product p = productMap.get(item.getProductId());
@@ -276,7 +279,9 @@ public class PurchaseOrderService {
                .append("\"").append(item.getProductName()).append("\",")
                .append(category).append(",")
                .append(item.getUnitCost()).append(",")
-               .append(item.getQuantityOrdered()).append("\n");
+               .append(item.getQuantityOrdered()).append(",")
+               .append("").append(",") // expiry_date blank
+               .append(defaultBatchNo).append("\n"); // batch_no linked to PO
         }
 
         return csv.toString();

@@ -311,6 +311,7 @@ public class OrderService {
 
     /**
      * Admin: update order status by orderNo.
+     * When cancelling, restores stock and deletes the payment record.
      */
     @Transactional
     public void updateOrderStatus(String orderNo, String newStatus) {
@@ -329,6 +330,27 @@ public class OrderService {
 
         o.setStatus(newStatus);
         orderMapper.updateById(o);
+
+        // Handle cancellation side-effects: restore stock + delete payment
+        if ("CANCELLED".equals(newStatus)) {
+            // 1) Restore stock for each order item
+            List<OrderItem> items = orderItemMapper.selectList(
+                    new QueryWrapper<OrderItem>().eq("order_id", o.getId()));
+            for (OrderItem it : items) {
+                productMapper.incrementStock(it.getProductId(), it.getQuantity());
+                // Log cancel return movement
+                if (stockMovementService != null) {
+                    stockMovementService.logMovement(
+                            it.getProductId(), null, "CANCEL_RETURN",
+                            it.getQuantity(), "ORDER", o.getId(),
+                            "Order cancelled by admin: " + o.getOrderNo());
+                }
+            }
+
+            // 2) Delete the payment record
+            paymentMapper.delete(
+                    new QueryWrapper<Payment>().eq("order_id", o.getId()));
+        }
     }
 
 }

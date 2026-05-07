@@ -21,7 +21,7 @@ public class RestockOptimizer {
         RestockCalculationResponse response = new RestockCalculationResponse();
         response.setSkuId(metrics.getSkuId());
 
-        // A. Demand Momentum (M)
+        // ── Step A: Demand Momentum (M) ──
         double longTermAvg = metrics.getAvgSales30d() != null ? metrics.getAvgSales30d() : 0.0;
         double shortTermAvg = metrics.getAvgSales3d() != null ? metrics.getAvgSales3d() : 0.0;
 
@@ -35,11 +35,12 @@ public class RestockOptimizer {
         }
         double mCapped = Math.min(Math.max(momentum, -1.0), 1.0);
 
+        // ── Step B: Adjusted Demand (D_adj) ──
         double baseDemand = (longTermAvg == 0) ? shortTermAvg : longTermAvg;
         double seasonalityFactor = metrics.getSeasonalityFactor() != null ? metrics.getSeasonalityFactor() : 1.0;
         double adjustedDemand = baseDemand * (1 + (BETA * mCapped)) * seasonalityFactor;
 
-        // B. Volatility-Adjusted Safety Stock (SS)
+        // ── Step C: Volatility-Based Safety Stock (SS) ──
         double stdDev = metrics.getStdDev30d() != null ? metrics.getStdDev30d() : 0.0;
         double cv = 0.0;
         if (baseDemand > 0) {
@@ -53,50 +54,57 @@ public class RestockOptimizer {
         int reviewPeriodDays = metrics.getReviewPeriodDays() != null ? metrics.getReviewPeriodDays() : 0;
         double safetyStock = dynamicZ * stdDev * Math.sqrt(leadTimeDays + reviewPeriodDays);
 
-        // C. Perishability Cap (Max Sellable Before Spoilage)
-        int usableShelfLifeDays = metrics.getShelfLifeDays() != null ? metrics.getShelfLifeDays() : 365; // Default long shelf life
-        double maxSellableQty = adjustedDemand * usableShelfLifeDays;
-
-        // D. Final Restock Calculation (Q)
+        // ── Step D: Adaptive Target Stock ──
         double targetStock = (adjustedDemand * (leadTimeDays + reviewPeriodDays)) + safetyStock;
-        
-        // Cap target stock to avoid spoilage
+
+        // ── Step E: Perishability Constraint ──
+        int usableShelfLifeDays = metrics.getShelfLifeDays() != null ? metrics.getShelfLifeDays() : 365;
+        double maxSellableQty = adjustedDemand * usableShelfLifeDays;
         double safeTargetStock = Math.min(targetStock, maxSellableQty);
 
+        // ── Step F: Net Requirement ──
         int currentStock = metrics.getCurrentStock() != null ? metrics.getCurrentStock() : 0;
         int incomingStock = metrics.getIncomingStock() != null ? metrics.getIncomingStock() : 0;
         int reservedStock = 0; // Not tracked in DB currently
-        
+
         double inventoryPosition = currentStock + incomingStock - reservedStock;
         double netRequirement = Math.max(0, safeTargetStock - inventoryPosition);
 
-        // E. Final Order Calculation (incorporating Exponential Decay for Perishables)
+        // ── Step G: Decay Adjustment ──
         double lambda = metrics.getWasteLambda() != null ? metrics.getWasteLambda() : 0.0;
         int expectedStorageDays = Math.min(leadTimeDays + reviewPeriodDays, usableShelfLifeDays);
         double decayFactor = Math.exp(-lambda * expectedStorageDays);
-        
+
         double rawOrderQty = netRequirement * decayFactor;
 
-        // Apply Constraints (Rounding to Case Size & Supplier MOQ)
+        // ── Step H: Practical Ordering Constraints ──
         int finalOrderQty = 0;
+        boolean moqRiskFlag = false;
+
         if (rawOrderQty > 0) {
             // Round up to nearest unit
             finalOrderQty = (int) Math.ceil(rawOrderQty);
-            
+
             // Round up to nearest Case Size
             int caseSize = metrics.getCaseSize() != null ? metrics.getCaseSize() : 1;
-            if (finalOrderQty % caseSize != 0) {
-                finalOrderQty += (caseSize - (finalOrderQty % caseSize));
+            if (caseSize > 1 && finalOrderQty % caseSize != 0) {
+                finalOrderQty = (int) (Math.ceil((double) finalOrderQty / caseSize) * caseSize);
             }
-            
-            // Apply Supplier MOQ
+
+            // Apply Supplier MOQ with risk flag
             int moq = metrics.getSupplierMoq() != null ? metrics.getSupplierMoq() : 1;
             if (finalOrderQty < moq) {
-                finalOrderQty = moq;
+                if (moq <= netRequirement) {
+                    // MOQ is within the net requirement — safe to apply
+                    finalOrderQty = moq;
+                } else {
+                    // MOQ exceeds net requirement — keep current qty but flag risk
+                    moqRiskFlag = true;
+                }
             }
         }
 
-        // F. Mapping Results to Response
+        // ── Mapping Results to Response ──
         response.setMomentum(mCapped);
         response.setAdjustedDemand(adjustedDemand);
         response.setCv(cv);
@@ -108,10 +116,12 @@ public class RestockOptimizer {
         response.setNetRequirement(netRequirement);
         response.setRawOrderQty(rawOrderQty);
         response.setDecayFactor(decayFactor);
+        response.setCurrentStock(currentStock);
         response.setIncomingStock(incomingStock);
         response.setCaseSize(metrics.getCaseSize() != null ? metrics.getCaseSize() : 1);
         response.setSeasonalityFactor(seasonalityFactor);
         response.setOrderQuantity(finalOrderQty);
+        response.setMoqRiskFlag(moqRiskFlag);
 
         return response;
     }

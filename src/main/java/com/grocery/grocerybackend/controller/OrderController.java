@@ -59,4 +59,21 @@ public class OrderController {
         orderService.updateOrderStatus(orderNo, newStatus);
         return Map.of("status", "ok", "newStatus", newStatus);
     }
+
+    @PutMapping("/bulk-status")
+    public Map<String, Object> bulkUpdateStatus(@RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<String> orderNos = (List<String>) body.get("orderNos");
+        String newStatus = (String) body.get("status");
+        int updated = 0;
+        for (String orderNo : orderNos) {
+            try {
+                orderService.updateOrderStatus(orderNo, newStatus);
+                updated++;
+            } catch (Exception e) {
+                System.err.println("Failed to update order " + orderNo + ": " + e.getMessage());
+            }
+        }
+        return Map.of("status", "ok", "updated", updated, "total", orderNos.size());
+    }
 }

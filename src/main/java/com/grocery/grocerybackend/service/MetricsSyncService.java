@@ -33,7 +33,8 @@ public class MetricsSyncService {
             // but we skip updating sales statistics to keep the demo curves consistent.
             String sku = stat.getSkuId();
             boolean isBenchmark = sku.equals("VG-OAT-001") || sku.equals("VG-STW-002") || 
-                                  sku.equals("VG-WAG-003") || sku.equals("VG-TRK-004");
+                                  sku.equals("VG-WAG-003") || sku.equals("VG-TRK-004") || 
+                                  sku.equals("VG-MNC-005") || sku.equals("VG-TRG-006");
 
             // 2. Check if metrics already exist for this SKU
             InventoryMetrics existing = mapper.findBySkuId(sku);

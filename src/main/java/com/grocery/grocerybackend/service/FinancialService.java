@@ -128,7 +128,11 @@ public class FinancialService {
 
                 // Expiring Soon Batches
                 Map<Long, String> productNames = products.stream()
-                                .collect(Collectors.toMap(Product::getId, Product::getName, (a, b) -> a));
+                                .collect(Collectors.toMap(
+                                                Product::getId, 
+                                                p -> p.getName() != null ? p.getName() : "Unknown", 
+                                                (a, b) -> a
+                                ));
                 List<StockReportDTO.ExpiringSoonBatch> expiringList = expiringSoon.stream()
                                 .map(b -> new StockReportDTO.ExpiringSoonBatch(
                                                 b.getProductId(),

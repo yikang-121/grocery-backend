@@ -1,5 +1,6 @@
 package com.grocery.grocerybackend.entity;
 
+import com.grocery.grocerybackend.entity.Batch;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
